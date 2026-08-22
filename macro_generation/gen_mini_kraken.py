@@ -28,7 +28,7 @@ MAX_H_PX = 24  # height may span along the PDN column
 # Ink fraction in each downsample cell (higher → thinner features / more eye holes).
 DOWNSAMPLE_THRESHOLD = 0.35
 PIXEL_UM = 1.7
-PIXEL_DRAW_UM = 1.9  # extra overlap so diagonal necks stay ≥ TM1 min width
+PIXEL_DRAW_UM = 1.75  # keep ≤~1.8 so 1px eye/tentacle holes stay ≥ TM1.b spacing
 MARGIN_UM = 1.0
 
 # Off: preserves eye holes (1px gaps). On: better DRC on diagonals, fills eyes.
