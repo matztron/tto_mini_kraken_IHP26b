@@ -16,7 +16,7 @@ HEX_PATH = TEST_DIR / "generated" / "hello_world.hex"
 # Golden words from pioasm (SET pins,1 [1] / SET pins,0 [1])
 EXPECTED_WORDS = [0xE101, 0xE100]
 
-# Config-mode ops on uio[6:4] (uio[7]=1)
+# Config-mode ops: IMEM on uio[6]=0 (addr uio[5:2]); other ops uio[6]=1, op uio[5:3]
 OP_IMEM = 0
 OP_EXEC = 1
 OP_PIN = 2
@@ -33,12 +33,20 @@ def load_hex(path: Path) -> list[int]:
 
 
 def _uio_cfg(op: int, *, addr: int = 0, half: int = 0, strobe: int = 0) -> int:
-    """Build uio_in for config mode."""
+    """Build uio_in for config mode (uio[7]=1)."""
+    if op == OP_IMEM:
+        # uio[6]=0 IMEM cycle: addr on uio[5:2]
+        return (
+            (1 << 7)
+            | ((addr & 0xF) << 2)
+            | ((half & 0x1) << 1)
+            | (strobe & 0x1)
+        )
+    # uio[6]=1 config strobe: op on uio[5:3]
     return (
         (1 << 7)
-        | ((op & 0x7) << 4)
-        | ((addr & 0x3) << 2)
-        | ((half & 0x1) << 1)
+        | (1 << 6)
+        | ((op & 0x7) << 3)
         | (strobe & 0x1)
     )
 
@@ -90,7 +98,7 @@ async def imem_write_word(dut, addr: int, word: int) -> None:
 
 
 async def load_program(dut, words: list[int]) -> None:
-    assert len(words) <= 4, "pin loader only addresses 4 IMEM words (uio[3:2])"
+    assert len(words) <= 16, "pin loader addresses 16 IMEM words (uio[5:2])"
     for addr, word in enumerate(words):
         await imem_write_word(dut, addr, word)
 

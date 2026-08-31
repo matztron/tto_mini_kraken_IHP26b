@@ -21,11 +21,15 @@ Instruction encoding and opcodes match the RP2040 PIO (`JMP`, `WAIT`, `IN`, `OUT
 
 ### Pin loader (config mode, `uio[7]=1`)
 
-Pulse **`uio[0]`** (rising edge) to apply the operation selected on **`uio[6:4]`**, with payload bytes on **`ui[7:0]`**:
+Pulse **`uio[0]`** (rising edge) to apply the operation, with payload bytes on **`ui[7:0]`**:
 
-| `uio[6:4]` | Operation | `ui[7:0]` meaning |
+| Encoding | Operation | Details |
 |---|---|---|
-| 0 | IMEM write | Low byte on first strobe (`uio[1]=0`), high byte on second (`uio[1]=1`). Address in `uio[3:2]` (4 words). Latch addr/half while `uio[0]=0`. |
+| `uio[6]=0` | **IMEM write** | `uio[5:2]` = address (16 words), `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
+| `uio[6]=1` | **Other ops** | `uio[5:3]` = op code, `uio[0]` = strobe |
+
+| `uio[5:3]` | Operation | `ui[7:0]` meaning |
+|---|---|---|
 | 1 | EXEC wrap | `ui[3:0]` = wrap bottom, `ui[7:4]` = wrap top |
 | 2 | PIN config | Set/out/sideset counts, side-set enable, side-set pindir |
 | 3 | CLKDIV low | Low byte of 16-bit divider |

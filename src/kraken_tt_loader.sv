@@ -1,9 +1,9 @@
 // Pin loader for tt_um_kraken_pio — program IMEM + config over ui/uio.
 //
 // Config mode: uio[7]=1
-//   uio[6:4] op:
-//     0 IMEM       uio[3:2]=addr[1:0], uio[1]=half, uio[0]=strobe
-//                (pin loader supports 4 IMEM words; latch addr/half while strobe=0)
+//   uio[6]=0  IMEM       uio[5:2]=addr[3:0], uio[1]=half, uio[0]=strobe
+//             (16 IMEM words; latch addr/half while strobe=0)
+//   uio[6]=1  other ops  uio[5:3]=op, uio[0]=strobe
 //     1 EXEC       ui[3:0]=wrap_bottom, ui[7:4]=wrap_top
 //     2 PIN        set/out/sideset counts, side_pindir, side_en
 //     3 CLKDIV lo
@@ -52,11 +52,13 @@ module kraken_tt_loader (
   logic        strobe_rise;
   logic [7:0]  imem_lo;
   logic [2:0]  op;
-  logic [1:0]  imem_addr_q;
+  logic        imem_cycle;
+  logic [3:0]  imem_addr_q;
   logic        imem_half_q;
 
   assign cfg_mode    = uio_in[7];
-  assign op          = uio_in[6:4];
+  assign imem_cycle  = cfg_mode && !uio_in[6];
+  assign op          = uio_in[6] ? uio_in[5:3] : OP_IMEM;
   assign strobe_rise = uio_in[0] && !strobe_q;
 
   always_ff @(posedge clk or negedge rst_n) begin
@@ -66,13 +68,13 @@ module kraken_tt_loader (
       strobe_q <= uio_in[0];
   end
 
-  // Latch IMEM addr/half while strobe is low (uio[0] shares addr[0]).
+  // Latch IMEM addr/half while strobe is low.
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       imem_addr_q <= '0;
       imem_half_q <= 1'b0;
-    end else if (cfg_mode && op == OP_IMEM && !uio_in[0]) begin
-      imem_addr_q <= uio_in[3:2];
+    end else if (imem_cycle && !uio_in[0]) begin
+      imem_addr_q <= uio_in[5:2];
       imem_half_q <= uio_in[1];
     end
   end
@@ -80,14 +82,14 @@ module kraken_tt_loader (
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       imem_lo <= 8'h00;
-    end else if (cfg_mode && strobe_rise && op == OP_IMEM && !imem_half_q) begin
+    end else if (imem_cycle && strobe_rise && !imem_half_q) begin
       imem_lo <= ui_in;
     end
   end
 
   always_comb begin
     imem_wr_en       = 1'b0;
-    imem_wr_addr     = kraken_pkg::pc_t'({2'b0, imem_addr_q});
+    imem_wr_addr     = kraken_pkg::pc_t'(imem_addr_q);
     imem_wr_data     = kraken_pkg::instr_t'({ui_in, imem_lo});
     exec_wr          = 1'b0;
     exec_data        = ui_in;
@@ -104,11 +106,10 @@ module kraken_tt_loader (
     clkdiv_byte      = ui_in;
 
     if (cfg_mode && strobe_rise) begin
-      unique case (op)
-        OP_IMEM: begin
-          if (imem_half_q)
-            imem_wr_en = 1'b1;
-        end
+      if (imem_cycle) begin
+        if (imem_half_q)
+          imem_wr_en = 1'b1;
+      end else unique case (op)
         OP_EXEC:         exec_wr        = 1'b1;
         OP_PIN:          pin_wr         = 1'b1;
         OP_CLKDIV_LO:    clkdiv_lo_wr   = 1'b1;
