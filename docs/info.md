@@ -13,7 +13,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 The design contains:
 
-- **One PIO state machine** with a 16-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
+- **One PIO state machine** with a 32-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
 - **A pin loader** for programming IMEM and SM configuration without a system bus. Set **`uio[7]=1`** to enter **config mode**; set **`uio[7]=0`** for **run mode**.
 - **A runtime clock divider** so the SM can run slower than the chip clock.
 
@@ -25,12 +25,12 @@ Pulse **`uio[0]`** (rising edge) to apply the operation, with payload bytes on *
 
 | Encoding | Operation | Details |
 |---|---|---|
-| `uio[6]=0` | **IMEM write** | `uio[5:2]` = address (16 words), `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
+| `uio[6]=0` | **IMEM write** | `uio[5:2]` = addr[3:0], `ui[4]` = addr[4], `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
 | `uio[6]=1` | **Other ops** | `uio[5:3]` = op code, `uio[0]` = strobe |
 
 | `uio[5:3]` | Operation | `ui[7:0]` meaning |
 |---|---|---|
-| 1 | EXEC wrap | `ui[3:0]` = wrap bottom, `ui[7:4]` = wrap top |
+| 1 | EXEC wrap | `ui[4:0]` = wrap bottom or top; `uio[2]=0` bottom, `uio[2]=1` top (two strobes) |
 | 2 | PIN config | Set/out/sideset counts, side-set enable, side-set pindir |
 | 3 | CLKDIV low | Low byte of 16-bit divider |
 | 4 | CLKDIV high | High byte of 16-bit divider |
@@ -78,6 +78,8 @@ The default test loads a two-instruction SET-pin square wave through config mode
 6. **UART RX example**: connect the incoming serial line to the GPIO input used by your program (`ui[0]` or `ui[1]`). When data arrives, pulse `uio[3]` to latch a received byte on `uo[7:0]`, read it from the host, then pulse `uio[4]` to release the latch. Check `uo[3]` (`rx_empty`) before popping.
 
 Monitor `uo[7:4]` for IRQ flags if your program uses `irq` instructions.
+
+**Demoboard loader:** use the MicroPython scripts in [`sdk/`](../sdk/README.md) — start with [`sdk/examples/blink/`](../sdk/examples/blink/run.py). UART and I2C demos live under [`sdk/examples/`](../sdk/examples/README.md).
 
 Gate-level simulation (after hardening): copy the generated netlist to `test/gate_level_netlist.v` and run `make -B GATES=yes`.
 

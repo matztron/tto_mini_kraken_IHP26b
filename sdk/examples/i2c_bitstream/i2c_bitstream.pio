@@ -1,0 +1,15 @@
+; Kraken mini I2C waveform shifter (32-word IMEM budget; this program uses 1 word).
+;
+; Shifts 2-bit (SDA, SCL) samples from the OSR to uo[1:0]:
+;   bit 0 → pin 0 (SDA), bit 1 → pin 1 (SCL)
+;
+; Use external 3.3 V pull-ups on SDA and SCL. The host precomputes line
+; states (START, bits, ACK slot, STOP) and pushes bytes via the TX FIFO;
+; each byte holds four (SDA, SCL) pairs. See i2c_encode.py.
+;
+; Host config: wrap 0..0, OUT_COUNT=2, autopull, pull_thresh=8 (full byte).
+
+.program i2c_bitstream
+.wrap_target
+    out pins, 2 [7]
+.wrap

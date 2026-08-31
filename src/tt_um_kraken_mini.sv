@@ -36,6 +36,7 @@ module tt_um_kraken_mini (
   pc_t    imem_wr_addr;
   instr_t imem_wr_data;
   logic       exec_wr;
+  logic       exec_wrap_top;
   logic [7:0] exec_data;
   logic       pin_wr;
   logic [7:0] pin_data;
@@ -158,6 +159,7 @@ module tt_um_kraken_mini (
     .imem_wr_addr     (imem_wr_addr),
     .imem_wr_data     (imem_wr_data),
     .exec_wr          (exec_wr),
+    .exec_wrap_top    (exec_wrap_top),
     .exec_data        (exec_data),
     .pin_wr           (pin_wr),
     .pin_data         (pin_data),
@@ -176,6 +178,7 @@ module tt_um_kraken_mini (
     .clk              (clk),
     .rst_n            (rst_n),
     .exec_wr          (exec_wr),
+    .exec_wrap_top    (exec_wrap_top),
     .exec_data        (exec_data),
     .pin_wr           (pin_wr),
     .pin_data         (pin_data),

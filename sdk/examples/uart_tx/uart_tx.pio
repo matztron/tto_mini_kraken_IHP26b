@@ -1,0 +1,16 @@
+; RP2040-compatible 8n1 UART TX (from pico-examples, trimmed).
+; OUT pin 0 and side-set pin 0 → uo[0] (connect to USB-serial RX).
+;
+; Host config: wrap 0..3, OUT_COUNT=1, SIDESET_COUNT=1, side_en,
+; autopull threshold 8, clkdiv = clock_hz / (8 * baud).
+
+.pio_version 0
+
+.program uart_tx
+.side_set 1 opt
+
+    pull       side 1 [7]
+    set x, 7   side 0 [7]
+bitloop:
+    out pins, 1
+    jmp x-- bitloop   [6]

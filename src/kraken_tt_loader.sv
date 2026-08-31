@@ -1,10 +1,10 @@
 // Pin loader for tt_um_kraken_pio — program IMEM + config over ui/uio.
 //
 // Config mode: uio[7]=1
-//   uio[6]=0  IMEM       uio[5:2]=addr[3:0], uio[1]=half, uio[0]=strobe
-//             (16 IMEM words; latch addr/half while strobe=0)
-//   uio[6]=1  other ops  uio[5:3]=op, uio[0]=strobe
-//     1 EXEC       ui[3:0]=wrap_bottom, ui[7:4]=wrap_top
+//   uio[6]=0  IMEM       uio[5:2]=addr[3:0], ui[4]=addr[4], uio[1]=half, uio[0]=strobe
+//             (32 IMEM words; latch addr/half while strobe=0)
+//   uio[6]=1  other ops  uio[5:3]=op, uio[2]=wrap_top (EXEC only), uio[0]=strobe
+//     1 EXEC       ui[4:0]=wrap_bottom or wrap_top (per uio[2])
 //     2 PIN        set/out/sideset counts, side_pindir, side_en
 //     3 CLKDIV lo
 //     4 CLKDIV hi
@@ -23,6 +23,7 @@ module kraken_tt_loader (
   output kraken_pkg::instr_t imem_wr_data,
 
   output logic       exec_wr,
+  output logic       exec_wrap_top,
   output logic [7:0] exec_data,
   output logic       pin_wr,
   output logic [7:0] pin_data,
@@ -53,13 +54,14 @@ module kraken_tt_loader (
   logic [7:0]  imem_lo;
   logic [2:0]  op;
   logic        imem_cycle;
-  logic [3:0]  imem_addr_q;
+  logic [4:0]  imem_addr_q;
   logic        imem_half_q;
 
-  assign cfg_mode    = uio_in[7];
-  assign imem_cycle  = cfg_mode && !uio_in[6];
-  assign op          = uio_in[6] ? uio_in[5:3] : OP_IMEM;
-  assign strobe_rise = uio_in[0] && !strobe_q;
+  assign cfg_mode      = uio_in[7];
+  assign imem_cycle    = cfg_mode && !uio_in[6];
+  assign op            = uio_in[6] ? uio_in[5:3] : OP_IMEM;
+  assign strobe_rise   = uio_in[0] && !strobe_q;
+  assign exec_wrap_top = uio_in[2];
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n)
@@ -74,7 +76,7 @@ module kraken_tt_loader (
       imem_addr_q <= '0;
       imem_half_q <= 1'b0;
     end else if (imem_cycle && !uio_in[0]) begin
-      imem_addr_q <= uio_in[5:2];
+      imem_addr_q <= {ui_in[4], uio_in[5:2]};
       imem_half_q <= uio_in[1];
     end
   end
@@ -89,8 +91,8 @@ module kraken_tt_loader (
 
   always_comb begin
     imem_wr_en       = 1'b0;
-    imem_wr_addr     = kraken_pkg::pc_t'(imem_addr_q);
-    imem_wr_data     = kraken_pkg::instr_t'({ui_in, imem_lo});
+    imem_wr_addr     = pc_t'(imem_addr_q);
+    imem_wr_data     = instr_t'({ui_in, imem_lo});
     exec_wr          = 1'b0;
     exec_data        = ui_in;
     pin_wr           = 1'b0;

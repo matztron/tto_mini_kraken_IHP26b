@@ -1,0 +1,10 @@
+; Kraken mini blink: 50% square wave on GPIO 0 (uo[0]).
+; Each instruction runs plus one delay cycle → high 2 clocks, low 2 clocks.
+;
+; Host config: wrap 0..1, SET_COUNT=1, clkdiv=1, sm_enable.
+
+.program blink
+.wrap_target
+    set pins, 1 [1]
+    set pins, 0 [1]
+.wrap

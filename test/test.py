@@ -13,10 +13,12 @@ from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 TEST_DIR = Path(__file__).resolve().parent
 HEX_PATH = TEST_DIR / "generated" / "hello_world.hex"
 
+IMEM_DEPTH = 32
+
 # Golden words from pioasm (SET pins,1 [1] / SET pins,0 [1])
 EXPECTED_WORDS = [0xE101, 0xE100]
 
-# Config-mode ops: IMEM on uio[6]=0 (addr uio[5:2]); other ops uio[6]=1, op uio[5:3]
+# Config-mode ops: IMEM on uio[6]=0 (addr uio[5:2]+ui[4]); other ops uio[6]=1
 OP_IMEM = 0
 OP_EXEC = 1
 OP_PIN = 2
@@ -32,21 +34,31 @@ def load_hex(path: Path) -> list[int]:
     return words
 
 
-def _uio_cfg(op: int, *, addr: int = 0, half: int = 0, strobe: int = 0) -> int:
+def _imem_addr_ui(addr: int) -> int:
+    return (addr >> 4) & 0x1
+
+
+def _uio_cfg(
+    op: int,
+    *,
+    addr: int = 0,
+    half: int = 0,
+    strobe: int = 0,
+    wrap_top_sel: int = 0,
+) -> int:
     """Build uio_in for config mode (uio[7]=1)."""
     if op == OP_IMEM:
-        # uio[6]=0 IMEM cycle: addr on uio[5:2]
         return (
             (1 << 7)
             | ((addr & 0xF) << 2)
             | ((half & 0x1) << 1)
             | (strobe & 0x1)
         )
-    # uio[6]=1 config strobe: op on uio[5:3]
     return (
         (1 << 7)
         | (1 << 6)
         | ((op & 0x7) << 3)
+        | ((wrap_top_sel & 0x1) << 2)
         | (strobe & 0x1)
     )
 
@@ -61,9 +73,9 @@ async def reset(dut, cycles: int = 10) -> None:
     await ClockCycles(dut.clk, 2)
 
 
-async def cfg_strobe(dut, op: int, data: int) -> None:
+async def cfg_strobe(dut, op: int, data: int, *, wrap_top_sel: int = 0) -> None:
     """Pulse uio[0] once in config mode to apply `op` with payload `data` on ui."""
-    base = _uio_cfg(op, strobe=0)
+    base = _uio_cfg(op, strobe=0, wrap_top_sel=wrap_top_sel)
     dut.ui_in.value = data & 0xFF
     dut.uio_in.value = base
     await RisingEdge(dut.clk)
@@ -73,24 +85,29 @@ async def cfg_strobe(dut, op: int, data: int) -> None:
     await RisingEdge(dut.clk)
 
 
+async def configure_wrap(dut, wrap_bottom: int, wrap_top: int) -> None:
+    await cfg_strobe(dut, OP_EXEC, wrap_bottom & 0x1F, wrap_top_sel=0)
+    await cfg_strobe(dut, OP_EXEC, wrap_top & 0x1F, wrap_top_sel=1)
+
+
 async def imem_write_word(dut, addr: int, word: int) -> None:
     """Write one 16-bit IMEM word via the two-strobe half-byte protocol."""
     lo = word & 0xFF
     hi = (word >> 8) & 0xFF
 
-    # Low byte: latch addr/half while strobe=0, then rising edge.
-    dut.ui_in.value = lo
+    dut.ui_in.value = _imem_addr_ui(addr)
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=0, strobe=0)
     await RisingEdge(dut.clk)
+    dut.ui_in.value = lo
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=0, strobe=1)
     await RisingEdge(dut.clk)
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=0, strobe=0)
     await RisingEdge(dut.clk)
 
-    # High byte: completes the IMEM write.
-    dut.ui_in.value = hi
+    dut.ui_in.value = _imem_addr_ui(addr)
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=1, strobe=0)
     await RisingEdge(dut.clk)
+    dut.ui_in.value = hi
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=1, strobe=1)
     await RisingEdge(dut.clk)
     dut.uio_in.value = _uio_cfg(OP_IMEM, addr=addr, half=1, strobe=0)
@@ -98,14 +115,14 @@ async def imem_write_word(dut, addr: int, word: int) -> None:
 
 
 async def load_program(dut, words: list[int]) -> None:
-    assert len(words) <= 16, "pin loader addresses 16 IMEM words (uio[5:2])"
+    assert len(words) <= IMEM_DEPTH, f"pin loader supports {IMEM_DEPTH} IMEM words"
     for addr, word in enumerate(words):
         await imem_write_word(dut, addr, word)
 
 
 async def configure_hello_world(dut) -> None:
     """wrap 0..1, SET_COUNT=1; CLKDIV already resets to 1."""
-    await cfg_strobe(dut, OP_EXEC, 0x10)  # wrap_top=1, wrap_bottom=0
+    await configure_wrap(dut, 0, 1)
     await cfg_strobe(dut, OP_PIN, 0x01)  # set_count=1
 
 
