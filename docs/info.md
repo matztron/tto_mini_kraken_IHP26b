@@ -21,16 +21,12 @@ Instruction encoding and opcodes match the RP2040 PIO (`JMP`, `WAIT`, `IN`, `OUT
 
 ### Pin loader (config mode, `uio[7]=1`)
 
-Pulse **`uio[0]`** (rising edge) to apply the operation, with payload bytes on **`ui[7:0]`**:
+Pulse **`uio[0]`** (rising edge) to apply the operation selected on **`uio[6:4]`**, with payload bytes on **`ui[7:0]`**:
 
-| Encoding | Operation | Details |
+| `uio[6:4]` | Operation | `ui[7:0]` meaning |
 |---|---|---|
-| `uio[6]=0` | **IMEM write** | `uio[5:2]` = addr[3:0], `ui[4]` = addr[4], `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
-| `uio[6]=1` | **Other ops** | `uio[5:3]` = op code, `uio[0]` = strobe |
-
-| `uio[5:3]` | Operation | `ui[7:0]` meaning |
-|---|---|---|
-| 1 | EXEC wrap | `ui[4:0]` = wrap bottom or top; `uio[2]=0` bottom, `uio[2]=1` top (two strobes) |
+| 0 | IMEM write | Low byte on first strobe (`uio[1]=0`), high byte on second (`uio[1]=1`). Address in `uio[3:2]` (4 words). Latch addr/half while `uio[0]=0`. |
+| 1 | EXEC wrap | `ui[3:0]` = wrap bottom, `ui[7:4]` = wrap top |
 | 2 | PIN config | Set/out/sideset counts, side-set enable, side-set pindir |
 | 3 | CLKDIV low | Low byte of 16-bit divider |
 | 4 | CLKDIV high | High byte of 16-bit divider |
@@ -78,8 +74,6 @@ The default test loads a two-instruction SET-pin square wave through config mode
 6. **UART RX example**: connect the incoming serial line to the GPIO input used by your program (`ui[0]` or `ui[1]`). When data arrives, pulse `uio[3]` to latch a received byte on `uo[7:0]`, read it from the host, then pulse `uio[4]` to release the latch. Check `uo[3]` (`rx_empty`) before popping.
 
 Monitor `uo[7:4]` for IRQ flags if your program uses `irq` instructions.
-
-**Demoboard loader:** use the MicroPython scripts in [`sdk/`](../sdk/README.md) — start with [`sdk/examples/blink/`](../sdk/examples/blink/run.py). UART and I2C demos live under [`sdk/examples/`](../sdk/examples/README.md).
 
 Gate-level simulation (after hardening): copy the generated netlist to `test/gate_level_netlist.v` and run `make -B GATES=yes`.
 

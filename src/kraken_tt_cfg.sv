@@ -4,7 +4,6 @@ module kraken_tt_cfg (
   input  logic       rst_n,
 
   input  logic       exec_wr,
-  input  logic       exec_wrap_top,
   input  logic [7:0] exec_data,
   input  logic       pin_wr,
   input  logic [7:0] pin_data,
@@ -59,10 +58,8 @@ module kraken_tt_cfg (
       clkdiv_int    <= CLKDIV_RST;
     end else begin
       if (exec_wr) begin
-        if (exec_wrap_top)
-          wrap_top <= kraken_pkg::pc_t'(exec_data[4:0]);
-        else
-          wrap_bottom <= kraken_pkg::pc_t'(exec_data[4:0]);
+        wrap_bottom <= kraken_pkg::pc_t'(exec_data[3:0]);
+        wrap_top    <= kraken_pkg::pc_t'(exec_data[7:4]);
       end
       if (pin_wr) begin
         set_count     <= {1'b0, pin_data[1:0]};
