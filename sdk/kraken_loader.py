@@ -168,14 +168,23 @@ class KrakenLoader:
         self.configure_thresh(0, 0)
         self.configure_clkdiv(clkdiv)
 
-    def configure_i2c_bitstream(self, clkdiv):
-        """OUT on pins [1:0], 8-bit autopull, one-instruction loop."""
-        self.configure_wrap(0, 0)
-        # out_count=2
-        self.cfg_strobe(OP_PIN, 0x08)
+    def configure_i2c_master(self, clkdiv, wrap_top=27):
+        """SET+OUT I2C master (see examples/i2c_master/i2c_master.pio)."""
+        self.configure_wrap(0, wrap_top)
+        # set_count=2, out_count=1
+        self.cfg_strobe(OP_PIN, 0x06)
+        self.configure_inpin(in_base=0, jmp_pin=0)
         self.configure_shift(autopull=1)
         self.configure_thresh(0, 0)
         self.configure_clkdiv(clkdiv)
+
+    def configure_i2c_bitstream(self, clkdiv):
+        """Deprecated alias — use configure_i2c_master."""
+        self.configure_i2c_master(clkdiv, wrap_top=0)
+
+    def configure_inpin(self, in_base=0, jmp_pin=0):
+        data = (in_base & 0x1F) | ((jmp_pin & 0x7) << 5)
+        self.cfg_strobe(OP_INPIN, data)
 
     @staticmethod
     def uart_clkdiv(clock_hz, baud):

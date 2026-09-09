@@ -1,4 +1,4 @@
-// Tiny Tapeout 1x1 programmable PIO tile — load IMEM + config via pins.
+// Tiny Tapeout 1x2 programmable PIO tile — load IMEM + config via pins.
 //
 // Run mode (uio[7]=0):
 //   ui[1:0]   gpio_in (also LSBs of TX byte when pushing)
