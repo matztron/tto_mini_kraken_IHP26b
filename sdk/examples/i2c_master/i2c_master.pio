@@ -1,46 +1,38 @@
-; Kraken mini I2C master (write-only, up to 2 FIFO bytes after first pull).
-; uo[0]=SDA, uo[1]=SCL — external 4.7k pull-ups to 3.3 V.
+; Kraken mini I2C master — single-byte write (fits 20-word IMEM).
+; uo[0]=SDA, uo[1]=SCL — use 4.7k pull-ups to 3.3 V.
 ;
-; SET pins, 2 + OUT pins, 1 (SDA via OUT, both via SET for SCL phases).
-; Host pushes I2C bytes (autopull 8): e.g. (addr<<1)&0xFE, then data.
-; First byte: START; second byte: no START; last byte: STOP.
+; SET imm: bit0=SDA, bit1=SCL  (set_count=2).
+; One TX FIFO byte = one bus transaction:
+;   START → 8 data bits (MSB first) → ACK slot → STOP
 ;
-; Config: SET_COUNT=2, OUT_COUNT=1, jmp_pin=0, autopull.
+; Push e.g. (addr7 << 1) & 0xFE for address+W. For addr+data, run twice
+; (each run does its own START…STOP), or use i2c_bitstream for multi-byte.
+;
+; Config: SET_COUNT=2, autopull, wrap 0..19.
 
 .program i2c_master
 .wrap_target
-    set x, 1
     pull block
-    mov isr, osr
-    set pins, 3           [7]
-    set pins, 1           [7]
-    set pins, 0           [7]
-write_byte:
-    set y, 7
+    mov y, osr
+    set pins, 2           [2]
+    set pins, 0           [2]
+    set x, 7
 bitloop:
-    mov osr, isr
-    out pins, 1
-    jmp pin bit1
-    set pins, 0           [4]
-    set pins, 1           [4]
-    jmp sdone
-bit1:
-    set pins, 2           [4]
-    set pins, 3           [4]
-sdone:
-    mov isr, osr
-    jmp y-- bitloop       [4]
-    set pins, 2           [7]
-    set pins, 3           [7]
-    set pins, 2           [7]
-after_write:
-    jmp !x do_stop
-    set x, 0
-    pull block
-    mov isr, osr
-    jmp write_byte
-do_stop:
-    set pins, 0           [7]
-    set pins, 1           [7]
-    set pins, 3           [7]
+    mov osr, y
+    out x, 1
+    jmp !x b0
+    set pins, 1           [1]
+    set pins, 3           [1]
+    jmp done
+b0:
+    set pins, 0           [1]
+    set pins, 2           [1]
+done:
+    mov y, osr
+    jmp x-- bitloop
+    set pins, 1           [2]
+    set pins, 3           [2]
+    set pins, 0           [2]
+    set pins, 2           [2]
+    set pins, 3           [2]
 .wrap

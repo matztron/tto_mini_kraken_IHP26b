@@ -13,7 +13,7 @@ from cocotb.triggers import ClockCycles, RisingEdge, ReadOnly
 TEST_DIR = Path(__file__).resolve().parent
 HEX_PATH = TEST_DIR / "generated" / "hello_world.hex"
 
-IMEM_DEPTH = 32
+IMEM_DEPTH = 20
 
 # Golden words from pioasm (SET pins,1 [1] / SET pins,0 [1])
 EXPECTED_WORDS = [0xE101, 0xE100]

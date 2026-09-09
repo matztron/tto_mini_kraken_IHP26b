@@ -1,23 +1,23 @@
 # SPDX-FileCopyrightText: © 2024 Tiny Tapeout / Matthias Musch
 # SPDX-License-Identifier: Apache-2.0
-"""I2C single-byte write master on uo[0]=SDA, uo[1]=SCL (pull-ups required).
+"""I2C master write demo on uo[0]=SDA, uo[1]=SCL (external pull-ups required).
 
-Each TX FIFO byte is one START…8 bits…ACK…STOP transaction.
-Default: write address byte for 7-bit device 0x50 (0xA0).
+Uses i2c_bitstream.pio (1 IMEM word) + host-encoded waveforms.
+Default: START, write 0x00 to 7-bit address 0x50, STOP.
 
   mpremote cp sdk/kraken_loader.py :
-  mpremote cp sdk/examples/i2c_master/i2c_master.hex sdk/examples/i2c_master/run.py :
-  mpremote run sdk/examples/i2c_master/run.py
+  mpremote cp sdk/examples/i2c_bitstream/*.py sdk/examples/i2c_bitstream/*.hex :
+  mpremote run sdk/examples/i2c_bitstream/run.py
 """
 
 import kraken_loader as kl
+import i2c_encode as ie
 
-HEX_PATH = "i2c_master.hex"
+HEX_PATH = "i2c_bitstream.hex"
 CLOCK_HZ = 1_000_000
 I2C_CLKDIV = 40
 I2C_ADDR = 0x50
-# Extra bytes: each is its own START…STOP (not a single multi-byte frame).
-I2C_DATA = ()
+I2C_DATA = (0x00,)
 
 
 def main(
@@ -35,30 +35,25 @@ def main(
     loader.setup_host_pins()
 
     words = kl.load_hex(hex_path)
-    assert len(words) <= kl.IMEM_DEPTH, "program exceeds IMEM_DEPTH"
-
-    payload = [(addr7 << 1) & 0xFE]
-    payload.extend(b & 0xFF for b in data)
-
+    payload = ie.encode_write(addr7, data)
     print(
         "IMEM words:", len(words),
-        "transactions:", [hex(b) for b in payload],
+        "FIFO bytes:", len(payload),
         "addr: 0x{:02x}".format(addr7),
     )
 
     loader.hardware_reset()
     loader.load_program(words)
-    loader.configure_i2c_master(clkdiv, wrap_top=len(words) - 1)
+    loader.configure_i2c_bitstream(clkdiv)
     loader.enter_run_mode(sm_enable=True, tx_drive=True)
 
     if clock_hz:
         tt.clock_project_PWM(clock_hz)
 
-    # One FIFO byte → one full START…STOP frame (SM wraps and pulls again).
     for b in payload:
         loader.tx_push(b)
 
-    print("I2C write(s) sent on uo[0]=SDA, uo[1]=SCL")
+    print("I2C waveform sent on uo[0]=SDA, uo[1]=SCL")
 
 
 if __name__ == "__main__":

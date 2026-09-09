@@ -9,7 +9,7 @@ package kraken_pkg;
   // ---------------------------------------------------------------------------
   localparam int unsigned INSTR_W        = 16;  // PIO instruction width (pioasm)
   localparam int unsigned DATA_W         = 8;   // ISR / OSR / scratch (UART byte)
-  localparam int unsigned IMEM_DEPTH     = 32;  // user .pio programs (Pico SM depth)
+  localparam int unsigned IMEM_DEPTH     = 20;  // fits 1x2; enough for ~18-instr I2C PIO
   localparam int unsigned PC_W           = $clog2(IMEM_DEPTH);
   localparam int unsigned GPIO_W         = 2;   // two PIO pads (uo[1:0])
   localparam int unsigned FIFO_DEPTH     = 2;   // TX/RX FIFO depth each
