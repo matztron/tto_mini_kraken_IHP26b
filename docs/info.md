@@ -13,7 +13,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 The design contains:
 
-- **One PIO state machine** with a 16-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
+- **One PIO state machine** with an 8-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
 - **A pin loader** for programming IMEM and SM configuration without a system bus. Set **`uio[7]=1`** to enter **config mode**; set **`uio[7]=0`** for **run mode**.
 - **A runtime clock divider** so the SM can run slower than the chip clock.
 
@@ -25,12 +25,12 @@ Pulse **`uio[0]`** (rising edge) to apply the operation, with payload bytes on *
 
 | Encoding | Operation | Details |
 |---|---|---|
-| `uio[6]=0` | **IMEM write** | `uio[5:2]` = address (16 words), `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
+| `uio[6]=0` | **IMEM write** | `uio[4:2]` = address (8 words), `uio[1]` = half, `uio[0]` = strobe. Low byte on first strobe (`half=0`), high byte on second (`half=1`). Latch addr/half while `strobe=0`. |
 | `uio[6]=1` | **Other ops** | `uio[5:3]` = op code, `uio[0]` = strobe |
 
 | `uio[5:3]` | Operation | `ui[7:0]` meaning |
 |---|---|---|
-| 1 | EXEC wrap | `ui[3:0]` = wrap bottom, `ui[7:4]` = wrap top |
+| 1 | EXEC wrap | `ui[3:0]` = wrap bottom, `ui[7:4]` = wrap top (low 3 bits used) |
 | 2 | PIN config | Set/out/sideset counts, side-set enable, side-set pindir |
 | 3 | CLKDIV low | Low byte of 16-bit divider |
 | 4 | CLKDIV high | High byte of 16-bit divider |

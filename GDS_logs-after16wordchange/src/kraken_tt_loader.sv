@@ -1,10 +1,10 @@
 // Pin loader for tt_um_kraken_pio — program IMEM + config over ui/uio.
 //
 // Config mode: uio[7]=1
-//   uio[6]=0  IMEM       uio[PC_W+1:2]=addr, uio[1]=half, uio[0]=strobe
-//             (IMEM_DEPTH words; latch addr/half while strobe=0)
+//   uio[6]=0  IMEM       uio[5:2]=addr[3:0], uio[1]=half, uio[0]=strobe
+//             (16 IMEM words; latch addr/half while strobe=0)
 //   uio[6]=1  other ops  uio[5:3]=op, uio[0]=strobe
-//     1 EXEC       ui[3:0]=wrap_bottom, ui[7:4]=wrap_top (low PC_W bits used)
+//     1 EXEC       ui[3:0]=wrap_bottom, ui[7:4]=wrap_top
 //     2 PIN        set/out/sideset counts, side_pindir, side_en
 //     3 CLKDIV lo
 //     4 CLKDIV hi
@@ -39,8 +39,6 @@ module kraken_tt_loader (
   typedef kraken_pkg::pc_t    pc_t;
   typedef kraken_pkg::instr_t instr_t;
 
-  localparam int unsigned PC_W = kraken_pkg::PC_W;
-
   localparam logic [2:0] OP_IMEM         = 3'd0;
   localparam logic [2:0] OP_EXEC         = 3'd1;
   localparam logic [2:0] OP_PIN          = 3'd2;
@@ -55,7 +53,7 @@ module kraken_tt_loader (
   logic [7:0]  imem_lo;
   logic [2:0]  op;
   logic        imem_cycle;
-  pc_t         imem_addr_q;
+  logic [3:0]  imem_addr_q;
   logic        imem_half_q;
 
   assign cfg_mode    = uio_in[7];
@@ -71,13 +69,12 @@ module kraken_tt_loader (
   end
 
   // Latch IMEM addr/half while strobe is low.
-  // Addr width tracks IMEM_DEPTH via PC_W (8 words → uio[4:2]).
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       imem_addr_q <= '0;
       imem_half_q <= 1'b0;
     end else if (imem_cycle && !uio_in[0]) begin
-      imem_addr_q <= uio_in[PC_W+1:2];
+      imem_addr_q <= uio_in[5:2];
       imem_half_q <= uio_in[1];
     end
   end
