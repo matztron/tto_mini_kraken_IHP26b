@@ -2,7 +2,7 @@
 //
 // Config mode: uio[7]=1
 //   uio[6]=0  IMEM       uio[5:2]=addr[3:0], ui[4]=addr[4], uio[1]=half, uio[0]=strobe
-//             (20 IMEM words; latch addr/half while strobe=0)
+//             (16 IMEM words; latch addr/half while strobe=0; ui[4] must be 0)
 //   uio[6]=1  other ops  uio[5:3]=op, uio[2]=wrap_top (EXEC only), uio[0]=strobe
 //     1 EXEC       ui[4:0]=wrap_bottom or wrap_top (per uio[2])
 //     2 PIN        set/out/sideset counts, side_pindir, side_en

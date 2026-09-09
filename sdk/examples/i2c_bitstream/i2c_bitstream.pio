@@ -1,4 +1,4 @@
-; Kraken mini I2C waveform shifter (fits in 1 IMEM word; 20-word budget).
+; Kraken mini I2C waveform shifter (fits in 1 IMEM word; 16-word budget).
 ;
 ; Shifts 2-bit (SDA, SCL) samples from the OSR to uo[1:0]:
 ;   bit 0 → pin 0 (SDA), bit 1 → pin 1 (SCL)

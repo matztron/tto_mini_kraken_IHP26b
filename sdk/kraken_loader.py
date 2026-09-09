@@ -19,7 +19,7 @@ OP_SHIFT = 5
 OP_THRESH = 6
 OP_INPIN = 7
 
-IMEM_DEPTH = 20
+IMEM_DEPTH = 16
 PROJECT_NAME = "tt_um_mini_kraken"
 
 # Pico drives all uio bits while bit-banging the loader.
@@ -169,7 +169,7 @@ class KrakenLoader:
         self.configure_clkdiv(clkdiv)
 
     def configure_i2c_master(self, clkdiv, wrap_top=19):
-        """Single-byte I2C write master (examples/i2c_master, ≤20 words)."""
+        """Single-byte I2C write master (reference; needs ≥20 IMEM words)."""
         self.configure_wrap(0, wrap_top)
         # set_count=2 (SDA+SCL via SET imm)
         self.cfg_strobe(OP_PIN, 0x02)

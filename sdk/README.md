@@ -59,7 +59,7 @@ print(loader.sample_uo0(8))   # expect [1,1,0,0,1,1,0,0]
 
 ## Loading your own `.pio` program
 
-1. Assemble on the PC: `pioasm -o hex myprog.pio myprog.hex` (max **20 words**).
+1. Assemble on the PC: `pioasm -o hex myprog.pio myprog.hex` (max **16 words**).
 2. Copy `myprog.hex` to the demoboard.
 3. Load and configure wrap / clkdiv / pin counts — see `KrakenLoader` helpers or `examples/`.
 

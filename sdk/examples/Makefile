@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 PIOASM ?= pioasm
-EXAMPLES := blink uart_tx i2c_master
+EXAMPLES := blink uart_tx i2c_bitstream
 
 .PHONY: all clean $(EXAMPLES)
 

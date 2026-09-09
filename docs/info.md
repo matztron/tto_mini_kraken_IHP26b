@@ -13,7 +13,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 The design contains:
 
-- **One PIO state machine** with a 20-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
+- **One PIO state machine** with a 16-word instruction memory (IMEM), 2-bit GPIO (`uo[1:0]`), TX/RX shift registers, and depth-2 TX/RX FIFOs.
 - **A pin loader** for programming IMEM and SM configuration without a system bus. Set **`uio[7]=1`** to enter **config mode**; set **`uio[7]=0`** for **run mode**.
 - **A runtime clock divider** so the SM can run slower than the chip clock.
 
