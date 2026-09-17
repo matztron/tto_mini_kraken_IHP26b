@@ -253,6 +253,15 @@ async def pulse_rx_ack(dut, *, sm_enable: bool = True) -> None:
     await RisingEdge(dut.clk)
 
 
+def is_gate_level(dut) -> bool:
+    """Gate-level netlists flatten hierarchy; RTL keeps kraken_mini_inst."""
+    try:
+        _ = dut.user_project.kraken_mini_inst
+        return False
+    except AttributeError:
+        return True
+
+
 def read_imem_word(dut, addr: int) -> int:
     """RTL hierarchical peek into instruction memory (not available in gate-level)."""
     mem = dut.user_project.kraken_mini_inst.u_imem.mem

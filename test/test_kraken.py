@@ -35,19 +35,52 @@ async def test_blink_square_wave(dut):
 # 2) Full 8-word IMEM addressability
 # ---------------------------------------------------------------------------
 
+# pioasm: `set pins, 1` / `set pins, 0` (no delay)
+_SET_PINS_1 = 0xE001
+_SET_PINS_0 = 0xE000
+
+
 @cocotb.test()
 async def test_imem_all_eight_words(dut):
-    """Pin loader must write distinct values to every IMEM address 0..7."""
-    # Unique non-zero payloads (not relying on opcode legality for storage).
-    pattern = [0xA000 | (i << 8) | (0x5A ^ i) for i in range(IMEM_DEPTH)]
+    """Each IMEM address 0..7 is writable and executable (RTL + gate-level).
 
+    For address A: slot A holds SET pins,1; every other slot is `jmp A`; wrap A..A.
+    After one jump we must see uo[0]=1. Invert polarity for the low phase.
+    """
     await tb.start_clock(dut)
     await tb.reset(dut)
-    await tb.load_program(dut, pattern)
 
-    for addr, want in enumerate(pattern):
-        got = tb.read_imem_word(dut, addr)
-        assert got == want, f"IMEM[{addr}]: got 0x{got:04x}, want 0x{want:04x}"
+    for addr in range(IMEM_DEPTH):
+        jmp_a = addr & 0x1F  # JMP ALWAYS → addr
+
+        # Phase A: unique high at `addr`
+        words = [jmp_a] * IMEM_DEPTH
+        words[addr] = _SET_PINS_1
+        await tb.load_program(dut, words)
+        await tb.configure_blink(dut, wrap_bottom=addr, wrap_top=addr)
+        await tb.enter_run_mode(dut, sm_enable=True)
+        # Cycle 0 may execute a jmp from PC=0; then SET sticks high.
+        samples = await tb.sample_uo0(dut, 5)
+        assert all(b == 1 for b in samples[-3:]), f"IMEM[{addr}] high phase: {samples}"
+
+        # Phase B: unique low at `addr`
+        words = [jmp_a] * IMEM_DEPTH
+        words[addr] = _SET_PINS_0
+        await tb.enter_run_mode(dut, sm_enable=False)
+        await tb.load_program(dut, words)
+        await tb.configure_blink(dut, wrap_bottom=addr, wrap_top=addr)
+        await tb.enter_run_mode(dut, sm_enable=True)
+        samples = await tb.sample_uo0(dut, 5)
+        assert all(b == 0 for b in samples[-3:]), f"IMEM[{addr}] low phase: {samples}"
+
+    # Extra RTL check: hierarchical peek still matches a known pattern when available.
+    if not tb.is_gate_level(dut):
+        pattern = [0xA000 | (i << 8) | (0x5A ^ i) for i in range(IMEM_DEPTH)]
+        await tb.enter_run_mode(dut, sm_enable=False)
+        await tb.load_program(dut, pattern)
+        for addr, want in enumerate(pattern):
+            got = tb.read_imem_word(dut, addr)
+            assert got == want, f"IMEM[{addr}] peek: got 0x{got:04x}, want 0x{want:04x}"
 
 
 @cocotb.test()

@@ -12,7 +12,7 @@ make -B GATES=yes
 | Test | What it locks |
 |------|----------------|
 | `test_blink_square_wave` | SET blink / pin loader smoke |
-| `test_imem_all_eight_words` | Loader writes IMEM[0..7] |
+| `test_imem_all_eight_words` | Each IMEM[0..7] writable+executable (GL-safe) |
 | `test_imem_execute_wrap_at_top` | Wrap/PC at words 6–7 |
 | `test_uart_tx_byte` | 8N1 frame on `uo[0]` (SDK `uart_tx.pio`) |
 | `test_tx_fifo_full` | Depth-2 TX FIFO + `uo[2]` |
