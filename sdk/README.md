@@ -1,41 +1,31 @@
 # Kraken mini — demoboard SDK
 
-MicroPython helpers to **program the Kraken PIO tile** on a [Tiny Tapeout demoboard](https://tinytapeout.com/guides/get-started-demoboard/) (RP2040/RP2350). Same pin-loader protocol as `test/test.py` and `src/kraken_tt_loader.sv`.
+MicroPython helpers to program **tt_um_mini_kraken** on a [Tiny Tapeout demoboard](https://tinytapeout.com/guides/get-started-demoboard/). Matches `test/test.py` and `src/kraken_tt_loader.sv` (8-word IMEM on a 1×2 tile).
 
-Works on:
-
-- **FPGA breakout** — test before silicon ([FPGA guide](https://tinytapeout.com/guides/fpga-breakout/))
-- **ASIC shuttle** — `tt.shuttle.tt_um_mini_kraken.enable()` after chips arrive
-
-## Layout
+Works on **FPGA breakout** ([guide](https://tinytapeout.com/guides/fpga-breakout/)) and **ASIC** (`tt.shuttle.tt_um_mini_kraken.enable()`).
 
 | Path | Purpose |
 |------|---------|
-| `kraken_loader.py` | Pin-loader protocol (IMEM, config, run mode, TX FIFO) |
-| [`examples/`](examples/README.md) | **Blink**, **UART TX**, and **I2C bitstream** demos |
-| `load_hello_world.py` | Legacy wrapper (prefer `examples/blink/run.py`) |
+| `kraken_loader.py` | Pin loader (IMEM, config, run mode, TX FIFO) |
+| [`examples/`](examples/README.md) | Blink, UART TX, I2C bitstream |
+| `load_hello_world.py` | Legacy blink wrapper |
 
-## Examples
-
-See **[examples/README.md](examples/README.md)** for per-demo wiring and `mpremote` commands.
+## Quick start
 
 ```bash
-make -C sdk/examples          # assemble .pio → .hex
+make -C sdk/examples
 mpremote cp sdk/kraken_loader.py :
 mpremote cp sdk/examples/blink/blink.hex sdk/examples/blink/run.py :
 mpremote run sdk/examples/blink/run.py
 ```
 
-## Prerequisites
+Needs [tt-micropython-firmware](https://github.com/TinyTapeout/tt-micropython-firmware). On FPGA, upload the bitstream first:
 
-1. Demoboard running [tt-micropython-firmware](https://github.com/TinyTapeout/tt-micropython-firmware) (flash UF2 from releases).
-2. **FPGA:** bitstream uploaded to `/bitstreams/tt_um_mini_kraken.bin`  
-   ```bash
-   tt_fpga.py configure --port /dev/ttyACM0 --upload --name tt_um_mini_kraken --clockrate 1000000
-   ```
-3. **ASIC:** project on your shuttle ROM (no bitstream step).
+```bash
+tt_fpga.py configure --port /dev/ttyACM0 --upload --name tt_um_mini_kraken --clockrate 1000000
+```
 
-## REPL usage
+## REPL
 
 ```python
 from ttboard.demoboard import DemoBoard
@@ -43,40 +33,24 @@ import kraken_loader as kl
 
 tt = DemoBoard.get()
 kl.enable_project(tt)
-
 loader = kl.KrakenLoader(tt)
 loader.setup_host_pins()
 loader.hardware_reset()
-
-words = kl.load_hex("blink.hex")
-loader.load_program(words)
+loader.load_program(kl.load_hex("blink.hex"))
 loader.configure_blink()
 loader.enter_run_mode(sm_enable=True)
-
 tt.clock_project_PWM(1_000_000)
-print(loader.sample_uo0(8))   # expect [1,1,0,0,1,1,0,0]
+print(loader.sample_uo0(8))  # [1,1,0,0,1,1,0,0]
 ```
 
-## Loading your own `.pio` program
+## Pin loader (config `uio[7]=1`)
 
-1. Assemble on the PC: `pioasm -o hex myprog.pio myprog.hex` (max **8 words**).
-2. Copy `myprog.hex` to the demoboard.
-3. Load and configure wrap / clkdiv / pin counts — see `KrakenLoader` helpers or `examples/`.
-
-## Pin loader recap
-
-Config mode (`uio[7]=1`):
-
-- **IMEM:** `uio[6]=0`, `uio[4:2]`=addr (0–7), half `uio[1]`, strobe `uio[0]`, data on `ui[7:0]`
+- **IMEM:** `uio[6]=0`, `uio[4:2]`=addr (0–7), half `uio[1]`, strobe `uio[0]`, data on `ui`
 - **Other ops:** `uio[6]=1`, op `uio[5:3]`, strobe `uio[0]`
-- **EXEC wrap:** one strobe — `ui[3:0]`=wrap bottom, `ui[7:4]`=wrap top
+- **EXEC wrap:** one strobe — `ui[3:0]` bottom, `ui[7:4]` top
 
-Run mode (`uio[7]=0`):
+Run mode (`uio[7]=0`): `uio[1]`=SM enable, `uio[0]`=TX push. Full map: [docs/info.md](../docs/info.md).
 
-- `uio[1]` = SM enable · `uio[0]` = TX push · `uo[0:1]` = PIO GPIO out
+Own programs: `pioasm -o hex myprog.pio myprog.hex` (max **8 words**), then configure wrap / pin / clkdiv via `KrakenLoader`.
 
-See `docs/info.md` for the full pin map.
-
-## FPGA note
-
-When an FPGA carrier is detected, the demoboard may start in `ASIC_MANUAL_INPUTS` mode. `KrakenLoader.setup_host_pins()` switches to **`ASIC_RP_CONTROL`** so the Pico drives `ui`/`uio` instead of the DIP switches.
+`setup_host_pins()` forces **`ASIC_RP_CONTROL`** so the Pico drives `ui`/`uio` (needed on FPGA carriers that start in DIP-switch mode).

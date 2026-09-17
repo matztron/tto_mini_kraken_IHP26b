@@ -9,7 +9,7 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-**Kraken IO Subprocessor (mini)** is a single-tile, RP2040-PIO-compatible programmable I/O block for Tiny Tapeout. It runs short programs compiled with [pioasm](https://github.com/raspberrypi/pico-sdk/tree/master/tools/pioasm) and is meant for bit-banged protocols (UART, SPI, WS2812, and similar) without tying up a host CPU.
+**Kraken IO Subprocessor (mini)** is a two-tile, RP2040-PIO-compatible programmable I/O block for Tiny Tapeout. It runs short programs compiled with [pioasm](https://github.com/raspberrypi/pico-sdk/tree/master/tools/pioasm) and is meant for bit-banged protocols (UART, SPI, WS2812, and similar) without tying up a host CPU.
 
 The design contains:
 
