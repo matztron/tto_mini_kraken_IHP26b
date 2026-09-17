@@ -1,5 +1,5 @@
 ; Kraken mini hello world: 50% square wave on SET pin 0.
-; Fits the pin-loader's 4-word IMEM window (only 2 instructions).
+; Fits the pin-loader's 8-word IMEM (only 2 instructions used).
 ;
 ; Timing (clkdiv = 1): each instruction runs, then 1 delay cycle.
 ;   SET 1 → idle → SET 0 → idle → wrap

@@ -82,26 +82,9 @@ endif
 # include cocotb's make rules to take care of the simulator setup
 include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
 
-.PHONY: assemble check-pioasm
+.PHONY: assemble check-hex
 
 SDK_UART_PIO = $(PWD)/../sdk/examples/uart_tx/uart_tx.pio
-
-check-pioasm:
-	@command -v $(PIOASM) >/dev/null 2>&1 || { \
-		echo "error: pioasm not found (PIOASM=$(PIOASM))"; \
-		echo "  export PATH=\"/Applications/pico-sdk-tools/pioasm:\$$PATH\""; \
-		echo "  or: make PIOASM=/path/to/pioasm"; \
-		exit 1; \
-	}
-
-assemble: check-pioasm
-	mkdir -p generated
-	$(PIOASM) -o hex hello_world.pio generated/hello_world.hex
-	$(PIOASM) -o hex pio/idle_spin.pio generated/idle_spin.hex
-	$(PIOASM) -o hex pio/rx_shift.pio generated/rx_shift.hex
-	$(PIOASM) -o hex pio/irq_set.pio generated/irq_set.hex
-	$(PIOASM) -o hex pio/irq_clear.pio generated/irq_clear.hex
-	$(PIOASM) -o hex $(SDK_UART_PIO) generated/uart_tx.hex
 
 HEX_ALL = \
   generated/hello_world.hex \
@@ -111,8 +94,39 @@ HEX_ALL = \
   generated/irq_clear.hex \
   generated/uart_tx.hex
 
+# True if PIOASM resolves to an executable (absolute path or on PATH).
+PIOASM_OK := $(shell \
+  if [ -x "$(PIOASM)" ] || command -v "$(PIOASM)" >/dev/null 2>&1; then echo yes; fi)
+
+check-hex:
+	@missing=0; \
+	for f in $(HEX_ALL); do \
+		if [ ! -f "$$f" ]; then echo "error: missing $$f"; missing=1; fi; \
+	done; \
+	if [ "$$missing" -ne 0 ]; then \
+		echo "error: committed/generated hex files required when pioasm is unavailable"; \
+		exit 1; \
+	fi
+
+assemble:
+ifeq ($(PIOASM_OK),yes)
+	mkdir -p generated
+	$(PIOASM) -o hex hello_world.pio generated/hello_world.hex
+	$(PIOASM) -o hex pio/idle_spin.pio generated/idle_spin.hex
+	$(PIOASM) -o hex pio/rx_shift.pio generated/rx_shift.hex
+	$(PIOASM) -o hex pio/irq_set.pio generated/irq_set.hex
+	$(PIOASM) -o hex pio/irq_clear.pio generated/irq_clear.hex
+	$(PIOASM) -o hex $(SDK_UART_PIO) generated/uart_tx.hex
+else
+	@echo "warning: pioasm not found (PIOASM=$(PIOASM)); using existing hex in generated/"
+	@$(MAKE) --no-print-directory check-hex
+	@# Refresh mtimes so dependent `sim` rules do not keep rebuilding.
+	@touch $(HEX_ALL)
+endif
+
+# Rebuild hex when sources change (no-op assemble if pioasm missing but hex present).
 $(HEX_ALL): hello_world.pio pio/idle_spin.pio pio/rx_shift.pio pio/irq_set.pio pio/irq_clear.pio $(SDK_UART_PIO)
 	$(MAKE) assemble
 
-# Hook assemble so local/CI runs always use pioasm-built programs.
+# Hook assemble so local/CI runs have the pio programs available.
 sim: $(HEX_ALL)
