@@ -1,20 +1,20 @@
 # Kraken mini — demoboard SDK
 
-MicroPython helpers to program **tt_um_mini_kraken** on a [Tiny Tapeout demoboard](https://tinytapeout.com/guides/get-started-demoboard/). Matches `test/test.py` and `src/kraken_tt_loader.sv` (8-word IMEM on a 1×2 tile).
+MicroPython helpers to program **tt_um_mini_kraken** on a [Tiny Tapeout demoboard](https://tinytapeout.com/guides/get-started-demoboard/). Packing comes from [`scripts/kraken_pin_protocol.py`](../scripts/kraken_pin_protocol.py) (same module cocotb imports — do not fork it).
 
 Works on **FPGA breakout** ([guide](https://tinytapeout.com/guides/fpga-breakout/)) and **ASIC** (`tt.shuttle.tt_um_mini_kraken.enable()`).
 
 | Path | Purpose |
 |------|---------|
-| `kraken_loader.py` | Pin loader (IMEM, config, run mode, TX FIFO) |
+| `kraken_pin_protocol.py` | Symlink to `scripts/` (copy this file to the board) |
+| `kraken_loader.py` | DemoBoard bit-bang API |
 | [`examples/`](examples/README.md) | Blink, UART TX, I2C bitstream |
-| `load_hello_world.py` | Legacy blink wrapper |
 
 ## Quick start
 
 ```bash
 make -C sdk/examples
-mpremote cp sdk/kraken_loader.py :
+mpremote cp scripts/kraken_pin_protocol.py sdk/kraken_loader.py :
 mpremote cp sdk/examples/blink/blink.hex sdk/examples/blink/run.py :
 mpremote run sdk/examples/blink/run.py
 ```
@@ -51,6 +51,6 @@ print(loader.sample_uo0(8))  # [1,1,0,0,1,1,0,0]
 
 Run mode (`uio[7]=0`): `uio[1]`=SM enable, `uio[0]`=TX push. Full map: [docs/info.md](../docs/info.md).
 
-Own programs: `pioasm -o hex myprog.pio myprog.hex` (max **8 words**), then configure wrap / pin / clkdiv via `KrakenLoader`.
+Own programs: `pioasm -o hex myprog.pio myprog.hex` (max **8 words**).
 
-`setup_host_pins()` forces **`ASIC_RP_CONTROL`** so the Pico drives `ui`/`uio` (needed on FPGA carriers that start in DIP-switch mode).
+`setup_host_pins()` forces **`ASIC_RP_CONTROL`** so the Pico drives `ui`/`uio`.

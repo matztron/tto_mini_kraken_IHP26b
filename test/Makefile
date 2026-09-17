@@ -67,12 +67,24 @@ VERILOG_SOURCES += $(PWD)/tb.v
 TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
-COCOTB_TEST_MODULES = test
+COCOTB_TEST_MODULES = test_kraken
+
+# Shared pin-protocol module (scripts/) must be importable by cocotb + helpers.
+export PYTHONPATH := $(PWD)/../scripts:$(PWD):$(PYTHONPATH)
+
+# Prefer the venv cocotb-config when present (CI/local).
+ifneq ($(wildcard $(PWD)/../.venv/bin/cocotb-config),)
+  COCOTB_CONFIG := $(PWD)/../.venv/bin/cocotb-config
+else
+  COCOTB_CONFIG := cocotb-config
+endif
 
 # include cocotb's make rules to take care of the simulator setup
-include $(shell cocotb-config --makefiles)/Makefile.sim
+include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
 
 .PHONY: assemble check-pioasm
+
+SDK_UART_PIO = $(PWD)/../sdk/examples/uart_tx/uart_tx.pio
 
 check-pioasm:
 	@command -v $(PIOASM) >/dev/null 2>&1 || { \
@@ -85,10 +97,22 @@ check-pioasm:
 assemble: check-pioasm
 	mkdir -p generated
 	$(PIOASM) -o hex hello_world.pio generated/hello_world.hex
+	$(PIOASM) -o hex pio/idle_spin.pio generated/idle_spin.hex
+	$(PIOASM) -o hex pio/rx_shift.pio generated/rx_shift.hex
+	$(PIOASM) -o hex pio/irq_set.pio generated/irq_set.hex
+	$(PIOASM) -o hex pio/irq_clear.pio generated/irq_clear.hex
+	$(PIOASM) -o hex $(SDK_UART_PIO) generated/uart_tx.hex
 
-# Ensure the pioasm hex exists before simulation (regenerate when .pio changes).
-generated/hello_world.hex: hello_world.pio
+HEX_ALL = \
+  generated/hello_world.hex \
+  generated/idle_spin.hex \
+  generated/rx_shift.hex \
+  generated/irq_set.hex \
+  generated/irq_clear.hex \
+  generated/uart_tx.hex
+
+$(HEX_ALL): hello_world.pio pio/idle_spin.pio pio/rx_shift.pio pio/irq_set.pio pio/irq_clear.pio $(SDK_UART_PIO)
 	$(MAKE) assemble
 
-# Hook assemble so local/CI runs always use a pioasm-built program.
-sim: generated/hello_world.hex
+# Hook assemble so local/CI runs always use pioasm-built programs.
+sim: $(HEX_ALL)

@@ -1,0 +1,5 @@
+; Hold IRQ0 asserted (re-set every wrap).
+.program irq_set
+.wrap_target
+    irq set 0
+.wrap

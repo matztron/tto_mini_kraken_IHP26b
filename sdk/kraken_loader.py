@@ -3,60 +3,43 @@
 """Kraken mini PIO pin loader for Tiny Tapeout demoboard (MicroPython).
 
 Programs IMEM and SM config over ui/uio in config mode (uio[7]=1), then runs
-the state machine in run mode (uio[7]=0). Matches test/test.py and kraken_tt_loader.sv.
+the state machine in run mode (uio[7]=0).
 
-Requires tt-micropython-firmware on the demoboard:
+Protocol packing lives in kraken_pin_protocol.py (from scripts/) — copy that
+file next to this module on the demoboard so SDK and cocotb cannot drift.
+
+Requires tt-micropython-firmware:
   https://github.com/TinyTapeout/tt-micropython-firmware
 """
 
-# Config-mode ops: IMEM when uio[6]=0 (addr uio[4:2]); other ops uio[6]=1
-OP_IMEM = 0
-OP_EXEC = 1
-OP_PIN = 2
-OP_CLKDIV_LO = 3
-OP_CLKDIV_HI = 4
-OP_SHIFT = 5
-OP_THRESH = 6
-OP_INPIN = 7
-
-IMEM_DEPTH = 8
-PROJECT_NAME = "tt_um_mini_kraken"
-
-# Pico drives all uio bits while bit-banging the loader.
-UIO_OE_CONFIG = 0xFF
-# Run mode: host drives uio[1]=sm_enable; uio[0]=tx_push when sending FIFO data.
-UIO_OE_RUN = 0x02
-UIO_OE_RUN_TX = 0x03
-
-
-def uio_cfg(op, addr=0, half=0, strobe=0):
-    """Build uio_in byte for config mode (uio[7]=1)."""
-    if op == OP_IMEM:
-        # uio[6]=0: addr on uio[4:2] (8 IMEM words)
-        return (
-            (1 << 7)
-            | ((addr & 0x7) << 2)
-            | ((half & 0x1) << 1)
-            | (strobe & 0x1)
-        )
-    return (
-        (1 << 7)
-        | (1 << 6)
-        | ((op & 0x7) << 3)
-        | (strobe & 0x1)
+try:
+    from kraken_pin_protocol import (
+        IMEM_DEPTH,
+        OP_CLKDIV_HI,
+        OP_CLKDIV_LO,
+        OP_EXEC,
+        OP_IMEM,
+        OP_INPIN,
+        OP_PIN,
+        OP_SHIFT,
+        OP_THRESH,
+        PROJECT_NAME,
+        UIO_OE_CONFIG,
+        UIO_OE_RUN,
+        load_hex,
+        pack_inpin,
+        pack_pin,
+        pack_shift,
+        pack_thresh,
+        pack_wrap,
+        uart_clkdiv,
+        uio_cfg,
     )
-
-
-def load_hex(path):
-    """Load pioasm -o hex words from a text file."""
-    words = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line[0] in "#/":
-                continue
-            words.append(int(line, 16))
-    return words
+except ImportError as exc:
+    raise ImportError(
+        "kraken_pin_protocol.py missing — copy scripts/kraken_pin_protocol.py "
+        "next to kraken_loader.py (same protocol as cocotb tests)"
+    ) from exc
 
 
 class KrakenLoader:
@@ -107,7 +90,6 @@ class KrakenLoader:
         lo = word & 0xFF
         hi = (word >> 8) & 0xFF
 
-        # Low byte: latch addr/half while strobe=0, then rising edge.
         self.tt.ui_in = lo
         self.tt.uio_in = uio_cfg(OP_IMEM, addr=addr, half=0, strobe=0)
         self.rising_tick()
@@ -116,7 +98,6 @@ class KrakenLoader:
         self.tt.uio_in = uio_cfg(OP_IMEM, addr=addr, half=0, strobe=0)
         self.rising_tick()
 
-        # High byte: completes the IMEM write.
         self.tt.ui_in = hi
         self.tt.uio_in = uio_cfg(OP_IMEM, addr=addr, half=1, strobe=0)
         self.rising_tick()
@@ -132,76 +113,59 @@ class KrakenLoader:
             self.imem_write_word(addr, word)
 
     def configure_hello_world(self):
-        """Alias for configure_blink (legacy name)."""
         self.configure_blink()
 
     def configure_blink(self):
-        """wrap 0..1, SET_COUNT=1; clkdiv defaults to 1."""
         self.configure_wrap(0, 1)
-        self.cfg_strobe(OP_PIN, 0x01)
+        self.cfg_strobe(OP_PIN, pack_pin(set_count=1))
 
     def configure_shift(self, in_shiftdir=0, out_shiftdir=1, autopush=0, autopull=0):
-        data = (
-            (in_shiftdir & 1)
-            | ((out_shiftdir & 1) << 1)
-            | ((autopush & 1) << 2)
-            | ((autopull & 1) << 3)
+        self.cfg_strobe(
+            OP_SHIFT,
+            pack_shift(in_shiftdir, out_shiftdir, autopush, autopull),
         )
-        self.cfg_strobe(OP_SHIFT, data)
 
     def configure_thresh(self, push_thresh=0, pull_thresh=0):
-        """Threshold 0 = full 8-bit width (see kraken_pkg thresh_decode)."""
-        data = (push_thresh & 0x1F) | ((pull_thresh & 0x7) << 5)
-        self.cfg_strobe(OP_THRESH, data)
+        self.cfg_strobe(OP_THRESH, pack_thresh(push_thresh, pull_thresh))
 
     def configure_uart_tx(self, clkdiv, wrap_top=3):
-        """Side-set + OUT on pin 0, 8-bit autopull, wrap over uart_tx.pio."""
         self.configure_wrap(0, wrap_top)
-        # side_en | sideset_count=1 | out_count=1
-        self.cfg_strobe(OP_PIN, 0x94)
+        self.cfg_strobe(
+            OP_PIN,
+            pack_pin(out_count=1, sideset_count=1, side_en=1),
+        )
         self.configure_shift(autopull=1)
         self.configure_thresh(0, 0)
         self.configure_clkdiv(clkdiv)
 
     def configure_i2c_bitstream(self, clkdiv):
-        """OUT on pins [1:0], 8-bit autopull, one-instruction loop."""
         self.configure_wrap(0, 0)
-        # out_count=2
-        self.cfg_strobe(OP_PIN, 0x08)
+        self.cfg_strobe(OP_PIN, pack_pin(out_count=2))
         self.configure_shift(autopull=1)
         self.configure_thresh(0, 0)
         self.configure_clkdiv(clkdiv)
 
     def configure_inpin(self, in_base=0, jmp_pin=0):
-        data = (in_base & 0x1F) | ((jmp_pin & 0x7) << 5)
-        self.cfg_strobe(OP_INPIN, data)
+        self.cfg_strobe(OP_INPIN, pack_inpin(in_base, jmp_pin))
 
     @staticmethod
     def uart_clkdiv(clock_hz, baud):
-        """Integer clkdiv for 8n1 UART (8 cycles per bit)."""
-        return max(1, clock_hz // (8 * baud))
+        return uart_clkdiv(clock_hz, baud)
 
     def configure_wrap(self, wrap_bottom, wrap_top):
-        """One EXEC: ui[3:0]=wrap_bottom, ui[7:4]=wrap_top (low 3 bits used)."""
-        data = (wrap_bottom & 0xF) | ((wrap_top & 0xF) << 4)
-        self.cfg_strobe(OP_EXEC, data)
+        self.cfg_strobe(OP_EXEC, pack_wrap(wrap_bottom, wrap_top))
 
     def configure_pin(self, set_count, out_count=0, sideset_count=0, side_en=0, side_pindir=0):
-        data = (
-            (side_en << 7)
-            | (side_pindir << 6)
-            | ((sideset_count & 0x3) << 4)
-            | ((out_count & 0x3) << 2)
-            | (set_count & 0x3)
+        self.cfg_strobe(
+            OP_PIN,
+            pack_pin(set_count, out_count, sideset_count, side_en, side_pindir),
         )
-        self.cfg_strobe(OP_PIN, data)
 
     def configure_clkdiv(self, divider):
         self.cfg_strobe(OP_CLKDIV_LO, divider & 0xFF)
         self.cfg_strobe(OP_CLKDIV_HI, (divider >> 8) & 0xFF)
 
     def enter_run_mode(self, sm_enable=False, tx_drive=False):
-        """Leave config mode (uio[7]=0). Optionally drive sm_enable and/or tx_push."""
         self.tt.ui_in = 0
         oe = 0
         if sm_enable:
@@ -215,7 +179,6 @@ class KrakenLoader:
         return bool(self.tt.uo_out.value & 0x04)
 
     def tx_push(self, byte):
-        """Push one byte into the TX FIFO (run mode, uio[7]=0)."""
         while self.tx_full():
             self.rising_tick()
         self.tt.ui_in = byte & 0xFF
@@ -232,7 +195,6 @@ class KrakenLoader:
             self.tx_push(b)
 
     def sample_uo0(self, n=8):
-        """Sample uo[0] after n rising clock edges (for quick sanity checks)."""
         samples = []
         for _ in range(n):
             self.rising_tick()
@@ -241,7 +203,6 @@ class KrakenLoader:
 
 
 def enable_project(tt, name=PROJECT_NAME):
-    """Select tt_um_mini_kraken on ASIC shuttle or FPGA bitstream."""
     design = getattr(tt.shuttle, name, None)
     if design is None:
         raise RuntimeError("project not found: {}".format(name))

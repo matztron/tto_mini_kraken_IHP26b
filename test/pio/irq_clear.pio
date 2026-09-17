@@ -1,0 +1,5 @@
+; Clear IRQ0 every wrap.
+.program irq_clear
+.wrap_target
+    irq clear 0
+.wrap

@@ -1,0 +1,1 @@
+../scripts/kraken_pin_protocol.py

@@ -1,0 +1,6 @@
+; Autopush RX: each instruction shifts 2 GPIO bits into the ISR.
+; After 4 wraps, autopush deposits one byte into the RX FIFO.
+.program rx_shift
+.wrap_target
+    in pins, 2
+.wrap

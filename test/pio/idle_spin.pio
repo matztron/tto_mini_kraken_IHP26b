@@ -1,0 +1,5 @@
+; Idle spin — never touches the TX FIFO (for FIFO-full tests).
+.program idle_spin
+.wrap_target
+    jmp 0
+.wrap

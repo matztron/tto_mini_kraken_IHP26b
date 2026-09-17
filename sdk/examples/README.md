@@ -1,6 +1,6 @@
 # Kraken mini SDK examples
 
-Demoboard demos (`.pio` + `.hex` + `run.py`). Copy `sdk/kraken_loader.py` to the board root first.
+Demoboard demos (`.pio` + `.hex` + `run.py`). Copy the shared protocol + loader to the board root first.
 
 | Example | GPIO | Notes |
 |---------|------|--------|
@@ -11,7 +11,7 @@ Demoboard demos (`.pio` + `.hex` + `run.py`). Copy `sdk/kraken_loader.py` to the
 ```bash
 make -C sdk/examples          # needs pioasm
 
-mpremote cp sdk/kraken_loader.py :
+mpremote cp scripts/kraken_pin_protocol.py sdk/kraken_loader.py :
 mpremote cp sdk/examples/blink/blink.hex sdk/examples/blink/run.py :
 mpremote run sdk/examples/blink/run.py
 ```

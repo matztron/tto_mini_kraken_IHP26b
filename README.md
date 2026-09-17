@@ -16,11 +16,11 @@ RP2040-style **PIO** tile for [Tiny Tapeout](https://tinytapeout.com): one state
 | RTL sim | [test/](test/README.md) |
 
 ```sh
-# cocotb square-wave smoke test
+# cocotb suite (blink, IMEM, UART, FIFO, clkdiv, restart, RX, IRQ)
 make -C test -B
 
 # demoboard examples (MicroPython)
 make -C sdk/examples
 ```
 
-Pin protocol, wrap/clkdiv programming, and run-mode pins are documented in the datasheet. Examples: blink, UART TX, I2C bitstream (`sdk/examples/`).
+Shared pin packing: [`scripts/kraken_pin_protocol.py`](scripts/kraken_pin_protocol.py) (SDK + tests). Protocol details: [docs/info.md](docs/info.md).
